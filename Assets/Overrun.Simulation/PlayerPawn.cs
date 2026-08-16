@@ -25,7 +25,13 @@ namespace Overrun.Simulation
         [Tooltip("Eye position the presentation camera follows. Not authoritative.")]
         [SerializeField] private Transform _head;
 
+        [Header("Loadout")]
+        [SerializeField] private WeaponRuntime _weapon;
+        [SerializeField] private Overrun.Data.WeaponDefinition _startingWeapon;
+
         private CharacterController _controller;
+        private RunContext _run;
+        private Health _health;
         private Vector3 _velocity;
         private float _yaw;
 
@@ -41,14 +47,34 @@ namespace Overrun.Simulation
         private void Awake()
         {
             _controller = GetComponent<CharacterController>();
+            _health = GetComponent<Health>();
             _yaw = transform.eulerAngles.y;
+            if (_weapon == null) _weapon = GetComponentInChildren<WeaponRuntime>();
         }
 
-        /// <summary>Server-only. Binds this pawn to a player slot.</summary>
-        public void AssignPlayer(PlayerId id)
+        /// <summary>
+        /// Server-only. Binds this pawn to a player slot and arms it.
+        /// Identity comes from the roster, never from NetworkObject ownership — two couch
+        /// players share one owner, so ownership cannot tell them apart.
+        /// </summary>
+        public void ServerInitialise(PlayerId id, RunContext run, PlayerState state)
         {
             if (!IsServer) return;
+
             Id = id;
+            _run = run;
+
+            if (_health != null)
+            {
+                _health.Configure(Stats.MaxHealth, Stats.Armor, true);
+            }
+
+            if (_weapon != null && state != null)
+            {
+                // The pawn's stats and the roster's stats must be the same object, or
+                // augments picked between rounds would apply to only one of them.
+                _weapon.ServerInitialise(_startingWeapon, state.Stats, id, run);
+            }
         }
 
         /// <summary>
@@ -97,6 +123,10 @@ namespace Overrun.Simulation
             _velocity.y += _gravity * deltaTime;
 
             _controller.Move(_velocity * deltaTime);
+
+            // Weapon resolution runs on the same authoritative step as movement, so a shot
+            // is always traced from where the server thinks the player is.
+            if (_weapon != null) _weapon.ServerTick(frame, Head, Time.time);
         }
 
         public void Teleport(Vector3 position, float yaw)

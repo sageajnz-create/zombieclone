@@ -150,5 +150,62 @@ namespace Overrun.Tests
 
             Assert.AreEqual(5f, stats.Resolve(StatId.MoveSpeed), Tol);
         }
+
+        // --- ResolveFor: modifiers applied to an externally-owned base ------------------
+
+        [Test]
+        public void ResolveFor_AppliesModifiersToTheSuppliedBase()
+        {
+            var stats = new StatBlock();
+            stats.SetBase(StatId.Damage, 999f);           // must be ignored by ResolveFor
+            stats.Add(new StatModifier(StatId.Damage, StatOp.Flat, 5f));
+            stats.Add(new StatModifier(StatId.Damage, StatOp.Increased, 0.5f));
+
+            // (10 + 5) * 1.5 = 22.5, using the weapon's base rather than the block's.
+            Assert.AreEqual(22.5f, stats.ResolveFor(10f, StatId.Damage), Tol);
+        }
+
+        [Test]
+        public void ResolveFor_DifferentBases_DoNotContaminateEachOther()
+        {
+            // Two weapons, one player. The shared modifier cache stores layers, not
+            // results — if it stored results, the second weapon would inherit the first's.
+            var stats = new StatBlock();
+            stats.Add(new StatModifier(StatId.Damage, StatOp.Increased, 1f));
+
+            Assert.AreEqual(20f, stats.ResolveFor(10f, StatId.Damage), Tol);
+            Assert.AreEqual(200f, stats.ResolveFor(100f, StatId.Damage), Tol);
+            Assert.AreEqual(20f, stats.ResolveFor(10f, StatId.Damage), Tol, "first weapon changed after second resolved");
+        }
+
+        [Test]
+        public void ResolveFor_RespectsTagFiltering()
+        {
+            var stats = new StatBlock();
+            stats.Add(new StatModifier(StatId.Damage, StatOp.Increased, 1f, new TagMask(Tag.Shock)));
+
+            Assert.AreEqual(50f, stats.ResolveFor(25f, StatId.Damage, Tag.Shock), Tol);
+            Assert.AreEqual(25f, stats.ResolveFor(25f, StatId.Damage, Tag.Fire), Tol);
+        }
+
+        [Test]
+        public void ResolveFor_AndResolve_AgreeWhenBasesMatch()
+        {
+            var stats = new StatBlock();
+            stats.SetBase(StatId.Damage, 40f);
+            stats.Add(new StatModifier(StatId.Damage, StatOp.More, 0.25f));
+
+            Assert.AreEqual(stats.Resolve(StatId.Damage), stats.ResolveFor(40f, StatId.Damage), Tol);
+        }
+
+        [Test]
+        public void ResolveFor_SeesModifiersAddedAfterAnEarlierResolve()
+        {
+            var stats = new StatBlock();
+            Assert.AreEqual(10f, stats.ResolveFor(10f, StatId.Damage), Tol);   // populates cache
+
+            stats.Add(new StatModifier(StatId.Damage, StatOp.Increased, 1f));
+            Assert.AreEqual(20f, stats.ResolveFor(10f, StatId.Damage), Tol, "stale layer cache after Add");
+        }
     }
 }

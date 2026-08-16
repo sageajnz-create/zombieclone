@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6693168b92168bfbc945c033be8dca42, type: 3}
+  m_Name: WeaponDef_Sidearm
+  m_EditorClassIdentifier: Overrun.Data::Overrun.Data.WeaponDefinition
+  DefinitionId: 14584746
+  DisplayName: Service Sidearm
+  Damage: 26
+  CritChance: 0.08
+  CritMultiplier: 2
+  HeadshotMultiplier: 2
+  FireInterval: 0.15
+  PelletCount: 1
+  Spread: 0.5
+  Range: 120
+  IsHitscan: 1
+  MagazineSize: 12
+  ReserveAmmo: 144
+  ReloadSeconds: 1.3

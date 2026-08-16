@@ -4,51 +4,75 @@ using Overrun.Core;
 
 namespace Overrun.Simulation
 {
+    /// <summary>Anything damage can be applied to.</summary>
     public interface IDamageable
     {
-        void TakeDamage(float amount, PlayerId attacker);
+        bool IsDead { get; }
+        void ApplyDamage(DamageContext context);
     }
 
     /// <summary>
-    /// Damage intake and death. Shared unchanged between enemies and player pawns —
-    /// composition rather than a subclass per entity type (Docs/ARCHITECTURE.md §8).
+    /// Damage intake and death. Shared unchanged between enemies, player pawns and
+    /// destructibles — composition rather than a subclass per entity type
+    /// (Docs/ARCHITECTURE.md §8).
     ///
-    /// Server-authoritative: damage only resolves on the server. Clients see the result
-    /// through replicated state, never by applying damage locally.
+    /// Server-authoritative: damage only resolves where IsServerAuthority is set. Clients
+    /// see the result through replicated state and never apply damage locally.
     /// </summary>
     public sealed class Health : MonoBehaviour, IDamageable
     {
         [SerializeField] private float _maxHealth = 100f;
+        [SerializeField] private float _armor;
 
         public float MaxHealth => _maxHealth;
         public float Current { get; private set; }
         public bool IsDead => Current <= 0f;
+        public float Normalised => _maxHealth > 0f ? Mathf.Clamp01(Current / _maxHealth) : 0f;
 
-        /// <summary>Raised on the server when this entity dies. (killer, victim)</summary>
-        public event Action<PlayerId, Health> Died;
+        /// <summary>Set by the owning networked component at spawn.</summary>
+        public bool IsServerAuthority { get; set; }
 
-        private bool _isServer;
+        /// <summary>Server-side. (killer, victim, killing blow)</summary>
+        public event Action<PlayerId, Health, DamageContext> Died;
+
+        /// <summary>Server-side, every applied hit. Drives hit markers and damage numbers.</summary>
+        public event Action<DamageContext> Damaged;
 
         private void Awake() => Current = _maxHealth;
 
-        /// <summary>Set by the owning networked component during spawn.</summary>
-        public void SetServerAuthority(bool isServer) => _isServer = isServer;
-
-        public void TakeDamage(float amount, PlayerId attacker)
+        public void Configure(float maxHealth, float armor, bool serverAuthority)
         {
-            if (!_isServer) return;          // damage resolves on the server only
-            if (IsDead || amount <= 0f) return;
+            _maxHealth = Mathf.Max(1f, maxHealth);
+            _armor = Mathf.Max(0f, armor);
+            IsServerAuthority = serverAuthority;
+            Current = _maxHealth;
+        }
 
-            Current -= amount;
+        public void ApplyDamage(DamageContext context)
+        {
+            if (!IsServerAuthority || IsDead || context == null) return;
+
+            // Flat armor reduction, floored so armor can never make a hit heal.
+            float applied = Mathf.Max(0f, context.Amount - _armor);
+            if (applied <= 0f) return;
+
+            context.Amount = applied;
+            Current -= applied;
+
+            Damaged?.Invoke(context);
+
             if (Current > 0f) return;
 
             Current = 0f;
-            Died?.Invoke(attacker, this);
+            Died?.Invoke(context.Source, this, context);
         }
 
-        public void ResetHealth()
+        public void Heal(float amount)
         {
-            Current = _maxHealth;
+            if (!IsServerAuthority || IsDead || amount <= 0f) return;
+            Current = Mathf.Min(_maxHealth, Current + amount);
         }
+
+        public void ResetHealth() => Current = _maxHealth;
     }
 }

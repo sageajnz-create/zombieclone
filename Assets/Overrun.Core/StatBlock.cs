@@ -24,11 +24,23 @@ namespace Overrun.Core
 
         private readonly Dictionary<StatId, float> _bases = new Dictionary<StatId, float>();
         private readonly List<Entry> _mods = new List<Entry>();
+        /// <summary>The three stacking layers, resolved but not yet applied to a base.</summary>
+        private struct Layers
+        {
+            public float Flat;
+            public float Increased;
+            public float More;
+        }
+
+        // Cache the LAYERS, not the final value. Caching the result would only serve
+        // Resolve(); weapons need the same modifiers applied to their own base value via
+        // ResolveFor(), and a per-weapon base must not thrash a shared cache.
+        //
         // Keyed by the full (stat, tag-context) pair. A packed scalar key would have to
         // squeeze a 64-bit Tag plus a StatId into one word, and a collision there would
-        // silently return another stat's value — the worst possible failure mode.
-        private readonly Dictionary<(StatId Stat, Tag Context), float> _cache =
-            new Dictionary<(StatId, Tag), float>();
+        // silently return another stat's modifiers — the worst possible failure mode.
+        private readonly Dictionary<(StatId Stat, Tag Context), Layers> _cache =
+            new Dictionary<(StatId, Tag), Layers>();
 
         private int _nextHandle = 1;
 
@@ -91,14 +103,26 @@ namespace Overrun.Core
         /// Resolve a stat for an action carrying <paramref name="context"/> tags.
         /// Pass Tag.None for context-free lookups (max health, move speed).
         /// </summary>
-        public float Resolve(StatId stat, Tag context = Tag.None)
+        public float Resolve(StatId stat, Tag context = Tag.None) =>
+            Apply(GetBase(stat), GetLayers(stat, context));
+
+        /// <summary>
+        /// Apply this block's modifiers to an externally-owned base value — a weapon's own
+        /// damage, an enemy definition's health. Lets one player's augments modify several
+        /// weapons correctly without any of them overwriting a shared base.
+        /// </summary>
+        public float ResolveFor(float baseValue, StatId stat, Tag context = Tag.None) =>
+            Apply(baseValue, GetLayers(stat, context));
+
+        private static float Apply(float baseValue, Layers l) =>
+            (baseValue + l.Flat) * (1f + l.Increased) * l.More;
+
+        private Layers GetLayers(StatId stat, Tag context)
         {
             var key = (stat, context);
-            if (_cache.TryGetValue(key, out var cached)) return cached;
+            if (_cache.TryGetValue(key, out Layers cached)) return cached;
 
-            float flat = 0f;
-            float increased = 0f;
-            float more = 1f;
+            var layers = new Layers { Flat = 0f, Increased = 0f, More = 1f };
 
             for (int i = 0; i < _mods.Count; i++)
             {
@@ -108,15 +132,14 @@ namespace Overrun.Core
 
                 switch (m.Op)
                 {
-                    case StatOp.Flat:      flat += m.Value; break;
-                    case StatOp.Increased: increased += m.Value; break;
-                    case StatOp.More:      more *= (1f + m.Value); break;
+                    case StatOp.Flat:      layers.Flat += m.Value; break;
+                    case StatOp.Increased: layers.Increased += m.Value; break;
+                    case StatOp.More:      layers.More *= (1f + m.Value); break;
                 }
             }
 
-            float result = (GetBase(stat) + flat) * (1f + increased) * more;
-            _cache[key] = result;
-            return result;
+            _cache[key] = layers;
+            return layers;
         }
 
         // ---- Convenience accessors for hot, context-free stats ----------------

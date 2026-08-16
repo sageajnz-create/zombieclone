@@ -219,11 +219,8 @@ namespace Overrun.EditorTools
                 }
             }
 
-            // Register at runtime — a serialized reference from NetSession (Bootstrap
-            // scene) to these transforms cannot survive, since Unity has no cross-scene
-            // object references.
-            if (spawnsGo.GetComponent<ArenaSpawnRegistrar>() == null)
-                spawnsGo.AddComponent<ArenaSpawnRegistrar>();
+            // The runtime registrar that binds these to the session (and the wave director)
+            // is added and wired by VS001Combat, which knows about all three.
 
             FindOrCreate(scene, "EnemyRoot");
             FindOrCreate(scene, "PlayerPawns");

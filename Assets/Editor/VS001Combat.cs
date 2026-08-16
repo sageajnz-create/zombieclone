@@ -42,6 +42,13 @@ namespace Overrun.EditorTools
             GameObject enemyPrefab = EnsureEnemyPrefab(enemyDef);
 
             ArmPawnPrefab(weapon);
+
+            // MUST happen before registration. A prefab built by script has
+            // GlobalObjectIdHash 0 until OnValidate runs, and NGO silently drops
+            // zero-hash entries — nothing would ever spawn.
+            NetworkPrefabTools.EnsureHash(PawnPath);
+            NetworkPrefabTools.EnsureHash(EnemyPrefabPath);
+
             WireWorldScene(enemyPrefab, enemyDef);
             RegisterEnemyPrefab(enemyPrefab);
 
@@ -213,12 +220,17 @@ namespace Overrun.EditorTools
             GameObject arena = Find(scene, "Arena");
             if (arena != null)
             {
-                if (arena.GetComponent<NavMeshSurface>() == null)
-                {
-                    var surface = arena.AddComponent<NavMeshSurface>();
-                    surface.collectObjects = CollectObjects.Children;
-                    surface.useGeometry = NavMeshCollectGeometry.RenderMeshes;
-                }
+                var surface = arena.GetComponent<NavMeshSurface>();
+                if (surface == null) surface = arena.AddComponent<NavMeshSurface>();
+
+                surface.collectObjects = CollectObjects.Children;
+
+                // PhysicsColliders, NOT RenderMeshes. Runtime baking from render meshes
+                // requires Read/Write-enabled meshes; Unity's primitive meshes are not,
+                // which spams "does not allow read access" and — per the warning itself —
+                // works in the Editor but silently fails in a built player. The greybox
+                // boxes all carry BoxColliders, so colliders are the correct source.
+                surface.useGeometry = NavMeshCollectGeometry.PhysicsColliders;
                 if (arena.GetComponent<ArenaNavMesh>() == null) arena.AddComponent<ArenaNavMesh>();
             }
 

@@ -23,6 +23,11 @@ namespace Overrun.Presentation
     {
         [SerializeField] private LocalPlayers _localPlayers;
 
+        [Tooltip("Shown before anyone has joined. Player rigs (and their cameras) only " +
+                 "exist once a device presses a button, so without this the game renders " +
+                 "nothing at all on start.")]
+        [SerializeField] private Camera _lobbyCamera;
+
         private NetSession _session;
         private PlayerInputManager _manager;
 
@@ -37,6 +42,19 @@ namespace Overrun.Presentation
             if (_manager == null) return;
             _manager.onPlayerJoined += OnPlayerJoined;
             _manager.onPlayerLeft += OnPlayerLeft;
+        }
+
+        private void Start() => UpdateLobbyCamera();
+
+        /// <summary>
+        /// The lobby camera renders only while no local player exists. Once a rig joins it
+        /// brings its own camera, and leaving both enabled would have them fight over the
+        /// full-screen viewport.
+        /// </summary>
+        private void UpdateLobbyCamera()
+        {
+            if (_lobbyCamera == null) return;
+            _lobbyCamera.enabled = _localPlayers == null || _localPlayers.Count == 0;
         }
 
         private void OnDisable()
@@ -92,6 +110,7 @@ namespace Overrun.Presentation
 
             // Ask the server to seat this slot. Even as host this goes through the RPC.
             session.RequestJoinLocalPlayerRpc((byte)slot);
+            UpdateLobbyCamera();
 
             Debug.Log($"[Overrun] Local player joined slot {slot} on: {string.Join(", ", playerInput.devices)}");
         }
@@ -102,6 +121,8 @@ namespace Overrun.Presentation
 
             var context = playerInput.GetComponentInChildren<PlayerContext>();
             if (context != null) _localPlayers.Remove(context);
+
+            UpdateLobbyCamera();
         }
 
         private void OnLocalPawnAssigned(byte localSlot, PlayerPawn pawn)

@@ -22,6 +22,7 @@ MonoBehaviour:
   AttackDamage: 12
   AttackRange: 1.9
   AttackInterval: 1.1
+  AttackTags: 8
   ScripReward: 10
   BudgetCost: 1
   SelectionWeight: 1

@@ -28,6 +28,18 @@ namespace Overrun.EditorTools
         private const string PawnPath = PrefabDir + "/PlayerPawn.prefab";
         private const string RigPath  = PrefabDir + "/LocalPlayerRig.prefab";
 
+        /// <summary>
+        /// Single safe entry point. The scene/prefab pass must run before the combat pass,
+        /// and running either alone leaves the project half-wired — so chain them.
+        /// </summary>
+        [MenuItem("Overrun/Run VS001 (All)", priority = 0)]
+        public static void RunEverything()
+        {
+            RunAll();
+            VS001Combat.RunAll();
+            Debug.Log("[Overrun] VS001 full setup complete.");
+        }
+
         [MenuItem("Overrun/Run VS001 Bootstrap")]
         public static void RunAll()
         {
@@ -49,6 +61,16 @@ namespace Overrun.EditorTools
 
         private static GameObject BuildPawnPrefab()
         {
+            // Do NOT rebuild an existing prefab. VS001Combat adds the WeaponRuntime and its
+            // definition reference to this asset; overwriting from scratch here silently
+            // destroyed that wiring, leaving a pawn that compiles, spawns, and cannot shoot.
+            var existing = AssetDatabase.LoadAssetAtPath<GameObject>(PawnPath);
+            if (existing != null)
+            {
+                Debug.Log($"[Overrun] {PawnPath} exists — preserving. Delete it to regenerate.");
+                return existing;
+            }
+
             var root = new GameObject("PlayerPawn");
 
             var cc = root.AddComponent<CharacterController>();
@@ -90,6 +112,13 @@ namespace Overrun.EditorTools
 
         private static GameObject BuildRigPrefab()
         {
+            var existing = AssetDatabase.LoadAssetAtPath<GameObject>(RigPath);
+            if (existing != null)
+            {
+                Debug.Log($"[Overrun] {RigPath} exists — preserving. Delete it to regenerate.");
+                return existing;
+            }
+
             var root = new GameObject("LocalPlayerRig");
 
             // Camera: NO AudioListener. Unity permits exactly one in the entire game and it
@@ -317,10 +346,27 @@ namespace Overrun.EditorTools
                 so.ApplyModifiedPropertiesWithoutUndo();
             }
 
+            // Something must render before any device presses a button, otherwise the game
+            // opens to a completely blank screen — player cameras only exist on rigs, and
+            // rigs only exist after a join.
+            GameObject lobbyGo = FindInScene(scene, "LobbyCamera");
+            if (lobbyGo == null)
+            {
+                lobbyGo = new GameObject("LobbyCamera");
+                SceneManager.MoveGameObjectToScene(lobbyGo, scene);
+                lobbyGo.transform.position = new Vector3(0f, 6f, -14f);
+                lobbyGo.transform.rotation = Quaternion.Euler(18f, 0f, 0f);
+            }
+
+            Camera lobbyCam = lobbyGo.GetComponent<Camera>();
+            if (lobbyCam == null) lobbyCam = lobbyGo.AddComponent<Camera>();
+            lobbyCam.depth = -10;   // behind any player camera, in case both are ever on
+
             var handler = joinGo.GetComponent<LocalPlayerJoinHandler>();
             if (handler != null)
             {
                 SetPrivateField(handler, "_localPlayers", localPlayersGo.GetComponent<LocalPlayers>());
+                SetPrivateField(handler, "_lobbyCamera", lobbyCam);
             }
 
             EditorSceneManager.MarkSceneDirty(scene);

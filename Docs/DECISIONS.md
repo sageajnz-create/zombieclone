@@ -527,3 +527,46 @@ of 3. Acceptable and localised; there are few such types.
 claims until something compiles them. The ADR-015 migration pass rewrote prose correctly but
 carried a code sample across an engine boundary that invalidated it. Treat doc snippets as
 claims to check, not as decisions already made.
+
+---
+
+## ADR-022 — `Tag` is 32-bit; Unity cannot serialise 64-bit enums
+
+**Status:** **Accepted** · 2026-08-16 · discovered at runtime during VS001
+
+**Context.** `GAMEPLAY_SYSTEMS.md` §2 originally specified `[Flags] enum Tag : ulong`, on
+the reasoning that 64 tags gives room for a large content library. That compiled fine and
+passed every EditMode test. It failed the moment the Editor tried to load a definition
+asset:
+
+```
+Unsupported enum type 'Overrun.Core.Tag' used for field 'Tags' in class 'WeaponDefinition'
+Unsupported enum type 'Overrun.Core.Tag' used for field 'AttackTags' in class 'EnemyDefinition'
+```
+
+Unity's serializer supports enums backed by 8/16/32-bit integer types only. A 64-bit
+backing type is rejected outright, so the field does not serialise at all — every weapon
+and enemy definition loses its tags, and the tag-filtered modifier system silently has
+nothing to filter on.
+
+**Decision.** `Tag : uint`. 32 flags maximum. 21 are currently used.
+
+**Rejected: keeping ulong and hiding the field.** Marking the tags `[NonSerialized]` and
+assigning them in code would defeat the point of data-driven definitions — the whole
+reason tags exist is so designers can author augment interactions without touching C#.
+
+**Rejected: pre-emptively building a 64-bit wrapper.** A serializable two-`uint` struct
+with implicit conversion to a 64-bit runtime value does work, and is the escape hatch if we
+ever need it. Building it now, with 11 bits still free, is exactly the premature
+abstraction the brief warns against.
+
+**Consequences.** A hard 32-tag ceiling, documented at the enum and in
+`GAMEPLAY_SYSTEMS.md` §2 so it is not rediscovered by someone adding the 33rd tag. Note
+that most future tags are *combinations* of existing ones rather than new bits, so the real
+headroom is larger than 11 suggests.
+
+**The transferable lesson, and it is the same one as ADR-021.** Compiling and passing tests
+proved nothing here: the type was legal C#, the unit tests exercised it happily, and the
+failure only appeared when Unity's asset pipeline touched a ScriptableObject field. Engine
+serialisation constraints are not visible from either the compiler or headless tests —
+they need an actual Editor load of actual assets.

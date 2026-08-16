@@ -49,7 +49,7 @@ Stats are recomputed on modifier change and cached, not per-frame.
 
 ```csharp
 [Flags]
-public enum Tag : ulong
+public enum Tag : uint      // NOT ulong — see below
 {
     None = 0,
     // Sources
@@ -65,6 +65,14 @@ public enum Tag : ulong
 
 A `TagMask` wraps this with `Matches(required, excluded)`. Everything carries tags:
 weapons, augments, damage events, status effects, abilities.
+
+> **32 tags maximum, and that ceiling is not negotiable by widening the enum.** Unity's
+> serializer rejects 64-bit-backed enums outright — a `ulong` `Tag` produces
+> *"Unsupported enum type 'Overrun.Core.Tag' used for field 'Tags'"* and silently kills
+> every `ScriptableObject` field that uses it, taking the whole data-driven definition
+> layer with it. 21 of 32 bits are currently used. If we approach the ceiling, the fix is
+> a serializable two-`uint` struct exposing a 64-bit runtime value — not `: ulong`.
+> See [`DECISIONS.md`](DECISIONS.md) ADR-022.
 
 This is the mechanism that delivers the brief's "future upgrades interact without bespoke
 code." *Lightning Rounds* (`Projectile|Elemental|Shock`), *Conductive Blood*

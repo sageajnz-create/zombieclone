@@ -10,38 +10,46 @@ namespace Overrun.Core
     /// "Lightning Rounds" (Projectile|Elemental|Shock), "Conductive Blood" (Shock|Status)
     /// and "Overcharge" (Shock|Critical) form an electrical build purely because each
     /// filters on Shock. No code knows those three are related.
+    ///
+    /// UNDERLYING TYPE IS uint, NOT ulong — 32 tags maximum.
+    /// Unity's serializer rejects enums with a 64-bit backing type outright:
+    ///     "Unsupported enum type 'Overrun.Core.Tag' used for field 'Tags'"
+    /// A ulong-backed Tag cannot appear on a ScriptableObject field, which would break the
+    /// entire data-driven definition layer. 21 of 32 bits are used; if we ever approach
+    /// the ceiling the fix is a serializable two-uint struct with implicit conversion to a
+    /// 64-bit runtime value, NOT widening this enum.
     /// </summary>
     [Flags]
-    public enum Tag : ulong
+    public enum Tag : uint
     {
-        None = 0UL,
+        None = 0u,
 
         // --- Source
-        Weapon     = 1UL << 0,
-        Projectile = 1UL << 1,
-        Hitscan    = 1UL << 2,
-        Melee      = 1UL << 3,
-        Ability    = 1UL << 4,
-        Companion  = 1UL << 5,
-        Trap       = 1UL << 6,
-        Explosion  = 1UL << 7,
+        Weapon     = 1u << 0,
+        Projectile = 1u << 1,
+        Hitscan    = 1u << 2,
+        Melee      = 1u << 3,
+        Ability    = 1u << 4,
+        Companion  = 1u << 5,
+        Trap       = 1u << 6,
+        Explosion  = 1u << 7,
 
         // --- Elements
-        Shock = 1UL << 8,
-        Fire  = 1UL << 9,
-        Frost = 1UL << 10,
-        Toxic = 1UL << 11,
-        Void  = 1UL << 12,
+        Shock = 1u << 8,
+        Fire  = 1u << 9,
+        Frost = 1u << 10,
+        Toxic = 1u << 11,
+        Void  = 1u << 12,
 
         // --- Roles
-        Critical  = 1UL << 16,
-        Status    = 1UL << 17,
-        Defense   = 1UL << 18,
-        Mobility  = 1UL << 19,
-        Economy   = 1UL << 20,
-        Support   = 1UL << 21,
-        Elemental = 1UL << 22,
-        Area      = 1UL << 23,
+        Critical  = 1u << 16,
+        Status    = 1u << 17,
+        Defense   = 1u << 18,
+        Mobility  = 1u << 19,
+        Economy   = 1u << 20,
+        Support   = 1u << 21,
+        Elemental = 1u << 22,
+        Area      = 1u << 23,
 
         AnyElement = Shock | Fire | Frost | Toxic | Void
     }

@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Overrun.Data::Overrun.Data.WeaponDefinition
   DefinitionId: 14584746
   DisplayName: Service Sidearm
+  Tags: 5
   Damage: 26
   CritChance: 0.08
   CritMultiplier: 2

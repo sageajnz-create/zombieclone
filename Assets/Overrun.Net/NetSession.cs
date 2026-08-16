@@ -1,0 +1,197 @@
+using UnityEngine;
+using Unity.Netcode;
+using Overrun.Core;
+using Overrun.Simulation;
+
+namespace Overrun.Net
+{
+    /// <summary>
+    /// Owns the run's session state and is the single translation point between Netcode
+    /// connection identity (ClientId) and game identity (PlayerId).
+    ///
+    /// This is the ONLY layer permitted to know client ids exist. Everything downstream
+    /// takes a PlayerId. See Docs/ARCHITECTURE.md Boundary B and Docs/NETWORKING.md §3.
+    /// </summary>
+    [RequireComponent(typeof(NetworkObject))]
+    public sealed class NetSession : NetworkBehaviour
+    {
+        public const int MaxPlayers = 4;
+
+        [SerializeField] private GameObject _pawnPrefab;
+        [SerializeField] private Transform[] _spawnPoints;
+
+        /// <summary>Server-side truth. Injected into simulation systems; never a singleton.</summary>
+        public PlayerRegistry Players { get; } = new PlayerRegistry();
+
+        /// <summary>Raised on a client when one of ITS local players receives a pawn.</summary>
+        public event System.Action<byte, PlayerPawn> LocalPawnAssigned;
+
+        /// <summary>
+        /// Locate the session without FindObjectOfType, by asking Netcode's own spawn
+        /// registry. NetworkManager.Singleton is a framework entry point rather than
+        /// gameplay state, so it is outside the singleton ban (ARCHITECTURE §1); the
+        /// session it returns is then *injected* into consumers rather than looked up
+        /// repeatedly. Called once per local join.
+        /// </summary>
+        public static NetSession Find(NetworkManager manager)
+        {
+            if (manager == null || manager.SpawnManager == null) return null;
+
+            foreach (var kv in manager.SpawnManager.SpawnedObjects)
+            {
+                if (kv.Value != null && kv.Value.TryGetComponent(out NetSession session)) return session;
+            }
+            return null;
+        }
+
+        // ------------------------------------------------------------- client -> server
+
+        /// <summary>
+        /// Ask the server to seat a local player in <paramref name="localSlot"/>.
+        /// The slot is scoped to the sender's own connection, so a client can only ever
+        /// add players to its own machine.
+        /// </summary>
+        [Rpc(SendTo.Server)]
+        public void RequestJoinLocalPlayerRpc(byte localSlot, RpcParams rpc = default)
+        {
+            ulong clientId = rpc.Receive.SenderClientId;
+            var id = new PlayerId(clientId, localSlot);
+
+            if (localSlot >= MaxPlayers) return;
+            if (Players.TryGet(id, out _)) return;                 // already seated
+            if (Players.Count >= MaxPlayers) return;               // run is full
+
+            PlayerState state = Players.Register(id);
+            SpawnPawnFor(state);
+        }
+
+        /// <summary>
+        /// One tick of intent. Stored, not acted on immediately — the server consumes it on
+        /// its own fixed step so a client cannot drive the simulation faster by flooding.
+        /// </summary>
+        [Rpc(SendTo.Server, Delivery = RpcDelivery.Unreliable)]
+        public void SubmitInputRpc(NetInputFrame wire, RpcParams rpc = default)
+        {
+            InputFrame frame = wire;
+
+            // PlayerId is ALWAYS rebuilt from the sender's own client id. Never trust a
+            // client-supplied one — this is what closes the impersonation hole.
+            var id = new PlayerId(rpc.Receive.SenderClientId, frame.LocalSlot);
+
+            if (!Players.TryGet(id, out PlayerState state)) return;
+
+            // Preserve edge-triggered presses that arrived since the last fixed step,
+            // otherwise a jump landing between ticks is silently swallowed.
+            uint carried = state.HasPendingInput ? state.PendingInput.Pressed : 0u;
+            frame.Pressed |= carried;
+
+            state.PendingInput = frame;
+            state.HasPendingInput = true;
+        }
+
+        // ------------------------------------------------------------- server -> client
+
+        [Rpc(SendTo.SpecifiedInParams)]
+        private void PawnAssignedRpc(byte localSlot, NetworkObjectReference pawnRef, RpcParams rpc)
+        {
+            if (!pawnRef.TryGet(out NetworkObject netObj)) return;
+
+            var pawn = netObj.GetComponent<PlayerPawn>();
+            if (pawn != null) LocalPawnAssigned?.Invoke(localSlot, pawn);
+        }
+
+        // -------------------------------------------------------------------- server sim
+
+        private void FixedUpdate()
+        {
+            if (!IsServer) return;
+
+            float dt = Time.fixedDeltaTime;
+            var all = Players.All;
+
+            for (int i = 0; i < all.Count; i++)
+            {
+                PlayerState state = all[i];
+                if (state.Pawn == null) continue;
+
+                if (state.HasPendingInput)
+                {
+                    state.Pawn.Tick(state.PendingInput, dt);
+
+                    // Consume edges; hold state persists until the client says otherwise.
+                    state.PendingInput.Pressed = 0u;
+                    state.PendingInput.LookDelta = Vector2.zero;
+                    state.HasPendingInput = false;
+                }
+                else
+                {
+                    // No packet this step: still integrate gravity, or a player standing
+                    // still would hang in the air.
+                    state.Pawn.Tick(default, dt);
+                }
+            }
+        }
+
+        // ------------------------------------------------------------------------ spawn
+
+        private void SpawnPawnFor(PlayerState state)
+        {
+            if (!IsServer || _pawnPrefab == null) return;
+
+            GetSpawnPose(Players.Count - 1, out Vector3 pos, out float yaw);
+
+            GameObject go = Instantiate(_pawnPrefab, pos, Quaternion.Euler(0f, yaw, 0f));
+            var netObj = go.GetComponent<NetworkObject>();
+            if (netObj == null)
+            {
+                Debug.LogError("[Overrun] Pawn prefab has no NetworkObject.", _pawnPrefab);
+                Destroy(go);
+                return;
+            }
+
+            netObj.Spawn(true);
+
+            var pawn = go.GetComponent<PlayerPawn>();
+            pawn.AssignPlayer(state.Id);
+            state.Pawn = pawn;
+
+            go.name = $"Pawn_{state.Id.ClientId}_{state.Id.LocalSlot}";
+
+            PawnAssignedRpc(state.Id.LocalSlot,
+                            new NetworkObjectReference(netObj),
+                            RpcTarget.Single(state.Id.ClientId, RpcTargetUse.Temp));
+        }
+
+        /// <summary>
+        /// Registered by the arena at runtime (see ArenaSpawnRegistrar). Not an inspector
+        /// field on this component, because the arena is in a different scene and Unity
+        /// cannot serialise cross-scene references.
+        /// </summary>
+        public void SetSpawnPoints(Transform[] points)
+        {
+            if (points == null || points.Length == 0) return;
+            _spawnPoints = points;
+        }
+
+        private void GetSpawnPose(int index, out Vector3 position, out float yaw)
+        {
+            if (_spawnPoints != null && _spawnPoints.Length > 0)
+            {
+                Transform t = _spawnPoints[Mathf.Clamp(index, 0, _spawnPoints.Length - 1)];
+                position = t.position;
+                yaw = t.eulerAngles.y;
+                return;
+            }
+
+            // Fallback so the slice is playable before spawn points are placed.
+            position = new Vector3(index * 2f, 1.2f, 0f);
+            yaw = 0f;
+        }
+
+        public override void OnNetworkDespawn()
+        {
+            if (IsServer) Players.UnregisterClient(NetworkManager.LocalClientId);
+            base.OnNetworkDespawn();
+        }
+    }
+}

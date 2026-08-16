@@ -1,0 +1,21 @@
+{
+    "name": "Overrun.Presentation",
+    "rootNamespace": "Overrun.Presentation",
+    "references": [
+        "Overrun.Core",
+        "Overrun.Data",
+        "Overrun.Simulation",
+        "Overrun.Net",
+        "Unity.Netcode.Runtime",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

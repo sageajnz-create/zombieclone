@@ -1,0 +1,16 @@
+{
+    "name": "Overrun.Data",
+    "rootNamespace": "Overrun.Data",
+    "references": [
+        "Overrun.Core"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

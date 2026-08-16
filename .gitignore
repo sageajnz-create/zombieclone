@@ -1,0 +1,59 @@
+# ---- Unity ----
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+
+# Never ignore .meta files. Unity tracks asset GUIDs in them; a missing .meta silently
+# breaks every reference to that asset for everyone else who clones the repo.
+!*.meta
+
+# Unity regenerates these from the asmdefs on every project open — build output, not
+# project configuration. ProjectSettings/ and Packages/ ARE committed.
+*.csproj
+*.unityproj
+*.sln
+*.slnx
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Addressables / streaming build artifacts
+/[Aa]ssets/[Aa]ddressable[Aa]ssets[Dd]ata/*/*.bin*
+/[Aa]ssets/[Ss]treaming[Aa]ssets/aa.meta
+/[Aa]ssets/[Ss]treaming[Aa]ssets/aa/*
+
+# Packaged output
+*.unitypackage
+*.apk
+*.aab
+*.app
+sysinfo.txt
+crashlytics-build.properties
+
+# ---- IDE ----
+.vs/
+.vscode/
+.idea/
+*.sln.DotSettings.user
+
+# ---- OS / DE ----
+.directory
+.DS_Store
+Thumbs.db
+
+# ---- Local-only ----
+/Local/
+*.log

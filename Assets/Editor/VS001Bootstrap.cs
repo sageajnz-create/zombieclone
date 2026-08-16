@@ -354,13 +354,20 @@ namespace Overrun.EditorTools
             {
                 lobbyGo = new GameObject("LobbyCamera");
                 SceneManager.MoveGameObjectToScene(lobbyGo, scene);
-                lobbyGo.transform.position = new Vector3(0f, 6f, -14f);
-                lobbyGo.transform.rotation = Quaternion.Euler(18f, 0f, 0f);
             }
+
+            // Always re-apply the pose. Room A spans z -8..+8 with 3m walls, so an earlier
+            // placement at z=-14 sat OUTSIDE the arena facing the back of the south wall —
+            // which looks identical to "nothing is rendering". This sits above the walls
+            // inside room A, angled down across the floor toward the corridor.
+            lobbyGo.transform.position = new Vector3(0f, 9f, -5f);
+            lobbyGo.transform.rotation = Quaternion.Euler(40f, 0f, 0f);
 
             Camera lobbyCam = lobbyGo.GetComponent<Camera>();
             if (lobbyCam == null) lobbyCam = lobbyGo.AddComponent<Camera>();
-            lobbyCam.depth = -10;   // behind any player camera, in case both are ever on
+            lobbyCam.depth = -10;              // behind any player camera, if both are ever on
+            lobbyCam.clearFlags = CameraClearFlags.Skybox;
+            lobbyCam.farClipPlane = 400f;
 
             var handler = joinGo.GetComponent<LocalPlayerJoinHandler>();
             if (handler != null)

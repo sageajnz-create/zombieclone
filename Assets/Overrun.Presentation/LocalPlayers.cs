@@ -14,7 +14,7 @@ namespace Overrun.Presentation
     /// </summary>
     public sealed class LocalPlayers : MonoBehaviour
     {
-        public const int MaxLocalPlayers = 4;
+        public const int MaxLocalPlayers = 2;
 
         private readonly List<PlayerContext> _contexts = new List<PlayerContext>();
 

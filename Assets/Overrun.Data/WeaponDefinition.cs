@@ -43,6 +43,14 @@ namespace Overrun.Data
         public int ReserveAmmo = 120;
         public float ReloadSeconds = 1.4f;
 
+        [Header("Recoil")]
+        [Tooltip("Degrees of upward kick per shot, applied to the aim origin.")]
+        public float RecoilPitch = 1.4f;
+        [Tooltip("Degrees of random yaw kick per shot.")]
+        public float RecoilYaw = 0.45f;
+        [Tooltip("Degrees per second the kick recovers.")]
+        public float RecoilRecovery = 12f;
+
         public float SecondsPerShot => Mathf.Max(0.01f, FireInterval);
     }
 }

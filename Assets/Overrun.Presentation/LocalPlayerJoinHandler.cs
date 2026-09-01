@@ -44,7 +44,15 @@ namespace Overrun.Presentation
             _manager.onPlayerLeft += OnPlayerLeft;
         }
 
-        private void Start() => UpdateLobbyCamera();
+        private void Start()
+        {
+            UpdateLobbyCamera();
+            if (GetComponent<LobbyPrompt>() == null)
+            {
+                var prompt = gameObject.AddComponent<LobbyPrompt>();
+                prompt.Bind(_localPlayers, _lobbyCamera);
+            }
+        }
 
         /// <summary>
         /// The lobby camera renders only while no local player exists. Once a rig joins it
@@ -105,6 +113,11 @@ namespace Overrun.Presentation
             var router = playerInput.GetComponentInChildren<LocalInputRouter>();
             if (router != null) router.Bind(context, session);
 
+            var hud = playerInput.GetComponentInChildren<PlayerHud>(true);
+            if (hud == null && context.Hud != null)
+                hud = context.Hud.gameObject.AddComponent<PlayerHud>();
+            if (hud != null) hud.Bind(context, session);
+
             session.LocalPawnAssigned -= OnLocalPawnAssigned;
             session.LocalPawnAssigned += OnLocalPawnAssigned;
 
@@ -132,6 +145,10 @@ namespace Overrun.Presentation
 
             var rig = context.GetComponentInChildren<PlayerCameraRig>();
             if (rig != null) rig.Follow(pawn);
+
+            var hud = context.GetComponentInChildren<PlayerHud>(true);
+            if (hud == null && context.Hud != null) hud = context.Hud.GetComponent<PlayerHud>();
+            if (hud != null) hud.Follow(pawn);
         }
 
         private void OnDestroy()

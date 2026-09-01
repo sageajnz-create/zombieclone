@@ -27,3 +27,6 @@ MonoBehaviour:
   MagazineSize: 12
   ReserveAmmo: 144
   ReloadSeconds: 1.3
+  RecoilPitch: 1.4
+  RecoilYaw: 0.45
+  RecoilRecovery: 12

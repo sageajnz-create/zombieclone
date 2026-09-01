@@ -66,7 +66,13 @@ namespace Overrun.Presentation
 
         private void Update()
         {
-            if (_look != null) _lookAccum += _look.ReadValue<Vector2>();
+            Vector2 look = _look != null ? _look.ReadValue<Vector2>() : Vector2.zero;
+
+            // Mouse delta is pixels; a gamepad stick is -1..1. Scale the stick so look
+            // speed is playable without changing mouse feel.
+            if (IsGamepadLook()) look *= 180f * Time.deltaTime;
+
+            _lookAccum += look;
 
             Accumulate(_fire,      InputButton.Fire);
             Accumulate(_aim,       InputButton.Aim);
@@ -77,6 +83,12 @@ namespace Overrun.Presentation
             Accumulate(_melee,     InputButton.Melee);
             Accumulate(_ability,   InputButton.Ability);
             Accumulate(_equipment, InputButton.Equipment);
+        }
+
+        private bool IsGamepadLook()
+        {
+            if (_look == null || _look.activeControl == null) return false;
+            return _look.activeControl.device is Gamepad;
         }
 
         private void Accumulate(InputAction action, InputButton button)

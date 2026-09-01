@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e8ac9e76158f4603804e219be5f39b98, type: 3}
+  m_Name: DefinitionCatalog
+  m_EditorClassIdentifier: Overrun.Data::Overrun.Data.DefinitionCatalog
+  Sidearm: {fileID: 11400000, guid: 1d856c2bd1c5fcf159d9b84b01ca3bcb, type: 2}
+  BasicEnemy: {fileID: 11400000, guid: 54027dfdb69b5d95c9f80873424a20b5, type: 2}
+  Augments:
+  - {fileID: 11400000, guid: 687119150d2048e19ecd9d3ff52bf56c, type: 2}
+  - {fileID: 11400000, guid: 819caf6a14a7474e8670599ce2c00a17, type: 2}
+  - {fileID: 11400000, guid: 88d0149611dc462998bc05aa4c8ae8ac, type: 2}
+  - {fileID: 11400000, guid: e57aef03ad1048fca020a9a2197932ee, type: 2}
+  - {fileID: 11400000, guid: e5c07a00158a44e79886bcf98ead4259, type: 2}
+  - {fileID: 11400000, guid: 84f97abece954d4e8715d39bf21fffab, type: 2}

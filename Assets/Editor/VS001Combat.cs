@@ -39,6 +39,7 @@ namespace Overrun.EditorTools
 
             WeaponDefinition weapon = EnsureWeapon();
             EnemyDefinition enemyDef = EnsureEnemyDefinition();
+            EnsureAugments();
             GameObject enemyPrefab = EnsureEnemyPrefab(enemyDef);
 
             ArmPawnPrefab(weapon);
@@ -83,6 +84,9 @@ namespace Overrun.EditorTools
             def.MagazineSize = 12;
             def.ReserveAmmo = 144;
             def.ReloadSeconds = 1.3f;
+            def.RecoilPitch = 1.4f;
+            def.RecoilYaw = 0.45f;
+            def.RecoilRecovery = 12f;
 
             EditorUtility.SetDirty(def);
             return def;
@@ -115,6 +119,52 @@ namespace Overrun.EditorTools
 
             EditorUtility.SetDirty(def);
             return def;
+        }
+
+        private static void EnsureAugments()
+        {
+            EnsureAugment("AugmentDef_PlatedHide", "augment.platedhide", "Plated Hide",
+                          "Plates under the coat. +25 max health.",
+                          Tag.Defense, StatId.MaxHealth, StatOp.Flat, 25f, Tag.None);
+            EnsureAugment("AugmentDef_Longstride", "augment.longstride", "Longstride",
+                          "+20% increased move speed.",
+                          Tag.Mobility, StatId.MoveSpeed, StatOp.Increased, 0.20f, Tag.None);
+            EnsureAugment("AugmentDef_Serrated", "augment.serrated", "Serrated",
+                          "+25% increased damage with weapons.",
+                          Tag.Weapon, StatId.Damage, StatOp.Increased, 0.25f, Tag.Weapon);
+            EnsureAugment("AugmentDef_NimbleMag", "augment.nimblemag", "Nimble Mag",
+                          "+30% increased reload speed.",
+                          Tag.Weapon, StatId.ReloadSpeed, StatOp.Increased, 0.30f, Tag.None);
+            EnsureAugment("AugmentDef_ScavengerCircuit", "augment.scavenger", "Scavenger Circuit",
+                          "+50% increased scrip from kills.",
+                          Tag.Economy, StatId.ScripGain, StatOp.Increased, 0.50f, Tag.Economy);
+            EnsureAugment("AugmentDef_Overpressure", "augment.overpressure", "Overpressure",
+                          "+20% increased fire rate.",
+                          Tag.Weapon, StatId.FireRate, StatOp.Increased, 0.20f, Tag.None);
+        }
+
+        private static void EnsureAugment(string file, string key, string display, string description,
+                                          Tag tags, StatId stat, StatOp op, float value, Tag required)
+        {
+            string path = DefDir + "/" + file + ".asset";
+            var def = AssetDatabase.LoadAssetAtPath<AugmentDefinition>(path);
+            if (def == null)
+            {
+                def = ScriptableObject.CreateInstance<AugmentDefinition>();
+                AssetDatabase.CreateAsset(def, path);
+            }
+
+            def.DefinitionId = StableId(key);
+            def.DisplayName = display;
+            def.Description = description;
+            def.Rarity = 1;
+            def.Tags = tags;
+            def.MaxStacks = 1;
+            def.Modifiers = new[]
+            {
+                new AuthoredModifier { Stat = stat, Op = op, Value = value, RequiredTags = required }
+            };
+            EditorUtility.SetDirty(def);
         }
 
         /// <summary>Deterministic id from a name, so ids stay stable across machines.</summary>

@@ -43,6 +43,12 @@ reference is a compile error.
 
 One greybox arena. One or two local players. It should be genuinely fun for ninety seconds.
 
+> **In tree on `master` + this slice.** Combat loop (weapon, enemy, director, split-screen
+> host) landed earlier. Remaining VS001 pieces — Site Bulkhead, augment choice, death →
+> results → restart, recoil, HUD — are implemented in code. The milestone is **done when**
+> two people on one couch survive to round 5, buy the door, pick an augment, die, and
+> restart. That bar still needs Sage's playtest in the Editor; do not start VS002 until then.
+
 **Scope**
 
 - Greybox arena: two rooms joined by one purchasable door, one spawn zone per room

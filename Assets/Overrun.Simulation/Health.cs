@@ -73,6 +73,23 @@ namespace Overrun.Simulation
             Current = Mathf.Min(_maxHealth, Current + amount);
         }
 
-        public void ResetHealth() => Current = _maxHealth;
+        /// <summary>Raise the cap and current health by the same amount (augment pick).</summary>
+        public void IncreaseMax(float delta)
+        {
+            if (!IsServerAuthority || IsDead || delta <= 0f) return;
+            _maxHealth += delta;
+            Current += delta;
+        }
+
+        public void ResetHealth()
+        {
+            Current = _maxHealth;
+        }
+
+        public void ResetHealth(float maxHealth)
+        {
+            _maxHealth = Mathf.Max(1f, maxHealth);
+            Current = _maxHealth;
+        }
     }
 }

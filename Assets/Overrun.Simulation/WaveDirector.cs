@@ -29,20 +29,22 @@ namespace Overrun.Simulation
         [Header("Pacing")]
         [SerializeField] private int _maxAlive = 16;
         [SerializeField] private float _spawnInterval = 0.9f;
-        [SerializeField] private float _interRoundSeconds = 5f;
+        [SerializeField] private float _interRoundSeconds = 2.5f;
 
         private RunContext _run;
         private bool _isServer;
-        private readonly List<Transform> _spawnZones = new List<Transform>();
+        private readonly List<SpawnZone> _spawnZones = new List<SpawnZone>();
         private readonly List<Enemy> _alive = new List<Enemy>();
 
         private float _budgetRemaining;
         private float _nextSpawnTime;
         private float _nextRoundTime;
         private bool _roundActive;
+        private bool _waitingForAugments;
 
         public int AliveCount => _alive.Count;
         public bool RoundActive => _roundActive;
+        public bool WaitingForAugments => _waitingForAugments;
 
         /// <summary>
         /// Server-only. Takes an explicit server flag rather than deriving it from
@@ -53,11 +55,39 @@ namespace Overrun.Simulation
         /// </summary>
         public void ServerInitialise(RunContext run, bool isServer)
         {
+            if (_run != null)
+            {
+                _run.OffersResolved -= OnOffersResolved;
+                _run.RunReset -= ServerReset;
+                _run.RunEnded -= OnRunEnded;
+            }
+
             _run = run;
             _isServer = isServer;
+
+            if (_run != null && _isServer)
+            {
+                _run.OffersResolved += OnOffersResolved;
+                _run.RunReset += ServerReset;
+                _run.RunEnded += OnRunEnded;
+            }
         }
 
         public void SetSpawnZones(IReadOnlyList<Transform> zones)
+        {
+            _spawnZones.Clear();
+            if (zones == null) return;
+            for (int i = 0; i < zones.Count; i++)
+            {
+                Transform t = zones[i];
+                if (t == null) continue;
+                SpawnZone zone = t.GetComponent<SpawnZone>();
+                if (zone == null) zone = t.gameObject.AddComponent<SpawnZone>();
+                _spawnZones.Add(zone);
+            }
+        }
+
+        public void SetSpawnZones(IReadOnlyList<SpawnZone> zones)
         {
             _spawnZones.Clear();
             if (zones == null) return;
@@ -67,11 +97,22 @@ namespace Overrun.Simulation
             }
         }
 
+        private void OnDestroy()
+        {
+            if (_run == null) return;
+            _run.OffersResolved -= OnOffersResolved;
+            _run.RunReset -= ServerReset;
+            _run.RunEnded -= OnRunEnded;
+        }
+
         private void Update()
         {
             if (!_isServer || _run == null) return;
+            if (_run.Phase == RunPhase.Ended) return;
 
             PruneDead();
+
+            if (_waitingForAugments) return;
 
             if (!_roundActive)
             {
@@ -97,6 +138,7 @@ namespace Overrun.Simulation
 
             _budgetRemaining = _baseBudget * Mathf.Pow(_budgetGrowth, _run.Round - 1) * playerScale;
             _roundActive = true;
+            _waitingForAugments = false;
             _nextSpawnTime = 0f;
 
             Debug.Log($"[Overrun] Round {_run.Round} — budget {_budgetRemaining:0.#}, {players} player(s)");
@@ -105,9 +147,46 @@ namespace Overrun.Simulation
         private void EndRound()
         {
             _roundActive = false;
-            _nextRoundTime = Time.time + _interRoundSeconds;
+            _waitingForAugments = true;
             _run.Procs.Prune(Time.time);
             Debug.Log($"[Overrun] Round {_run.Round} cleared.");
+            _run.NotifyRoundCleared();
+        }
+
+        private void OnOffersResolved()
+        {
+            _waitingForAugments = false;
+            _nextRoundTime = Time.time + _interRoundSeconds;
+        }
+
+        private void OnRunEnded()
+        {
+            _roundActive = false;
+            _waitingForAugments = false;
+            DespawnAll();
+        }
+
+        public void ServerReset()
+        {
+            DespawnAll();
+            _roundActive = false;
+            _waitingForAugments = false;
+            _budgetRemaining = 0f;
+            _nextRoundTime = 0f;
+            _nextSpawnTime = 0f;
+        }
+
+        public void DespawnAll()
+        {
+            for (int i = _alive.Count - 1; i >= 0; i--)
+            {
+                Enemy enemy = _alive[i];
+                if (enemy == null) continue;
+                NetworkObject netObj = enemy.NetworkObject;
+                if (netObj != null && netObj.IsSpawned) netObj.Despawn();
+                else Destroy(enemy.gameObject);
+            }
+            _alive.Clear();
         }
 
         private void TrySpawn()
@@ -115,7 +194,7 @@ namespace Overrun.Simulation
             if (_alive.Count >= _maxAlive) return;
             if (Time.time < _nextSpawnTime) return;
             if (_enemyPrefab == null || _pool == null || _pool.Length == 0) return;
-            if (_spawnZones.Count == 0) return;
+            if (UnlockedZoneCount() == 0) return;
 
             EnemyDefinition definition = PickDefinition();
             if (definition == null || definition.BudgetCost > _budgetRemaining)
@@ -125,13 +204,30 @@ namespace Overrun.Simulation
                 return;
             }
 
-            Transform zone = PickZone();
+            SpawnZone zone = PickZone();
             if (zone == null) return;
 
-            Spawn(definition, zone);
+            Spawn(definition, zone.transform);
 
             _budgetRemaining -= definition.BudgetCost;
             _nextSpawnTime = Time.time + _spawnInterval;
+        }
+
+        private int UnlockedZoneCount()
+        {
+            int n = 0;
+            for (int i = 0; i < _spawnZones.Count; i++)
+            {
+                if (IsZoneEligible(_spawnZones[i])) n++;
+            }
+            return n;
+        }
+
+        private bool IsZoneEligible(SpawnZone zone)
+        {
+            if (zone == null) return false;
+            if (_run != null && !_run.IsRegionUnlocked(zone.RegionId)) return false;
+            return zone.IsUnlocked;
         }
 
         private EnemyDefinition PickDefinition()
@@ -159,25 +255,29 @@ namespace Overrun.Simulation
             return null;
         }
 
-        private Transform PickZone()
+        private SpawnZone PickZone()
         {
-            // VS001: pick the zone furthest from the nearest player, as a stand-in for the
-            // real fairness rule (unlocked + distance band + not visible to any camera).
-            // Visibility needs replicated look directions, which lands with the door and
-            // region work — see GAMEPLAY_SYSTEMS.md §7.
-            Transform best = null;
+            SpawnZone best = null;
             float bestScore = float.MinValue;
 
             for (int i = 0; i < _spawnZones.Count; i++)
             {
-                Transform zone = _spawnZones[i];
-                float nearest = NearestPlayerDistance(zone.position);
+                SpawnZone zone = _spawnZones[i];
+                if (!IsZoneEligible(zone)) continue;
+
+                float nearest = NearestPlayerDistance(zone.transform.position);
                 if (nearest < 6f) continue;                 // never spawn on top of a player
 
                 if (nearest > bestScore) { bestScore = nearest; best = zone; }
             }
 
-            return best != null ? best : (_spawnZones.Count > 0 ? _spawnZones[0] : null);
+            if (best != null) return best;
+
+            for (int i = 0; i < _spawnZones.Count; i++)
+            {
+                if (IsZoneEligible(_spawnZones[i])) return _spawnZones[i];
+            }
+            return null;
         }
 
         private float NearestPlayerDistance(Vector3 point)

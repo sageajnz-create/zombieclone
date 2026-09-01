@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 695264d5d5990071a82f625c1a58a9ec, type: 3}
+  m_Name: AugmentDef_ScavengerCircuit
+  m_EditorClassIdentifier: Overrun.Data::Overrun.Data.AugmentDefinition
+  DefinitionId: 165723218
+  DisplayName: Scavenger Circuit
+  Description: +50% increased scrip from kills.
+  Rarity: 1
+  Tags: 1048576
+  Modifiers:
+  - Stat: 20
+    Op: 1
+    Value: 0.5
+    RequiredTags: 1048576
+  MaxStacks: 1

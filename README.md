@@ -1,15 +1,19 @@
 # OVERRUN *(working codename)*
 
-A first-person, 1–4 player co-op, round-based horde-survival roguelike.
+A first-person, 1–2 player (this slice) co-op, round-based horde-survival roguelike.
 
-Players drop into a hostile site, fight escalating waves, earn currency, unlock areas,
-buy and find weapons, take synergistic run upgrades, uncover secrets, fight bosses, and
-try to survive. A run should arc from *weak survivor* → *armed survivor* → *specialised
-build* → *absurd power fantasy*.
+Players drop into a hostile site, fight escalating waves, earn **scrip**, unlock a second
+room, pick **augments** between rounds, and try to survive. Death ends the run; restart
+from the results screen.
 
-> **Status: planning complete, no gameplay code yet.**
-> This repository currently contains architecture and roadmap documents only.
-> See [`Docs/DEVELOPMENT_ROADMAP.md`](Docs/DEVELOPMENT_ROADMAP.md) for what gets built first.
+> **Status: VS001 first playable.** Greybox arena, listen-server host, split-screen,
+> hitscan sidearm, melee **Sundered**, wave director, one purchasable bulkhead, six
+> augments, death → results → restart.
+> See [`Docs/DEVELOPMENT_ROADMAP.md`](Docs/DEVELOPMENT_ROADMAP.md). Do not implement VS002+
+> until this slice has been play-tested.
+
+The directory name `zombieclone` is a scratch name. It must not appear in product strings,
+UI, or scene names — the game is **Overrun**.
 
 ---
 
@@ -21,109 +25,122 @@ weapon names, story, UI layouts, audio, or art. All naming in these documents is
 placeholder naming and is subject to a clearance review before any public release.
 See [`Docs/GAME_VISION.md`](Docs/GAME_VISION.md#originality-boundary).
 
-The directory name `zombieclone` is a scratch name and should be renamed.
-
 ---
 
 ## Tech stack
 
 | Concern | Choice |
 | --- | --- |
-| Engine | **Unity 6000.5** ([ADR-015](Docs/DECISIONS.md)) |
-| Render pipeline | **URP** — chosen for 4-way split-screen cost ([ADR-018](Docs/DECISIONS.md)) |
-| Language | C# |
-| Networking | **Netcode for GameObjects 2.x** over Unity Transport, host/listen-server ([ADR-017](Docs/DECISIONS.md)) |
-| Data assets | `ScriptableObject` definitions |
-| Input | **Input System** package, `PlayerInputManager` + per-player `PlayerInput` |
-| Split-screen | Cameras with viewport rects, assigned by `PlayerInputManager` |
-| 3D content | Blender → FBX/glTF |
-
-Rationale for every one of these is recorded in [`Docs/DECISIONS.md`](Docs/DECISIONS.md).
+| Engine | **Unity 6000.5.8f1** ([ADR-015](Docs/DECISIONS.md)) |
+| Render pipeline | **URP** |
+| Language | C# 9 (Unity 6000.5 default — [ADR-021](Docs/DECISIONS.md)) |
+| Networking | Netcode for GameObjects 2.x, listen-server (`StartHost`) |
+| Input | Input System + `PlayerInputManager` split-screen |
+| AI | AI Navigation (NavMesh) |
 
 The Editor version is pinned in `ProjectSettings/ProjectVersion.txt`. **Do not let the Hub
-silently upgrade it** — a Unity version bump is an architectural decision and gets an ADR.
+silently upgrade it.**
 
 ---
 
-## Getting set up
+## Open in Unity Hub (Windows) — Sage
 
-Unity Hub is installed as a user Flatpak:
+Your clone lives wherever you put it (for example `C:\Users\sagea\Projects\zombieclone`).
+This repo does not depend on that path.
 
-```bash
-flatpak run com.unity.UnityHub
+1. Install **Unity Hub** from [unity.com/download](https://unity.com/download) and sign in.
+2. In Hub, **Installs → Install Editor**.
+3. Install **Unity 6000.5.8f1** specifically. If Hub hides older versions, use the archive:
+   [unity.com/releases/editor/archive](https://unity.com/releases/editor/archive) → 6000.5.8f1.
+4. Add modules: **Windows Build Support (Mono)** is enough to Play in the Editor. IL2CPP is optional.
+5. **Projects → Add** → select the folder that contains `Assets`, `Packages`, and
+   `ProjectSettings` (the repo root).
+6. Open the project with **6000.5.8f1**. First import takes several minutes. Wait until the
+   console is quiet.
+7. Confirm the title bar / About window says **6000.5.8f1**. If Hub upgraded you, switch
+   the project's Editor version back.
+
+Play Mode is forced to start from `Assets/Content/Scenes/Bootstrap.unity` (menu
+**Overrun → Always Start Play From Bootstrap**). You do **not** need to have Bootstrap
+open in the Hierarchy first.
+
+### Play
+
+1. Press **Play**.
+2. You should see the greybox rooms from above and an on-screen prompt.
+3. Press any keyboard key or a gamepad face button to join as player 1.
+4. Plug in a second gamepad (or use a second device) and press a button to join as player 2
+   (split-screen). VS001 caps local players at **2**.
+5. Shoot the **Sundered**, earn scrip, buy the **Site Bulkhead** in the corridor (**E** /
+   gamepad West / X), pick an augment after each round (**1 / 2 / 3** or gamepad X / Y / B).
+6. When everyone is down, **Fire** or **Jump** restarts the run.
+
+| Action | Keyboard / mouse | Gamepad |
+| --- | --- | --- |
+| Move | WASD | Left stick |
+| Look | Mouse | Right stick |
+| Fire | Left mouse | Right trigger |
+| Reload | R | North / Y |
+| Interact | E | West / X |
+| Jump | Space | South / A |
+| Sprint | Left Shift | Left stick press |
+| Join | Any bound button | Any face button |
+| Augment pick | 1 / 2 / 3 | West / North / East (X / Y / B) |
+
+If Play is a blank screen: stop Play, menu **Overrun → Always Start Play From Bootstrap**
+should be checked, then Play again. If enemies never appear, menu
+**Overrun → Repair Network Prefab Hashes** then Play.
+
+Optional rebuild of greybox content (idempotent): **Overrun → Run VS001 (All)**.
+
+### Headless EditMode tests (optional)
+
+Needs a Unity Editor on PATH. From the repo root:
+
+```bat
+Unity.exe -batchmode -nographics -projectPath "%CD%" -executeMethod Overrun.EditorTools.VS001Bootstrap.RunEverything
 ```
 
-Then, in the Hub UI:
+`-nographics` is fine for `-executeMethod`. For `-runTests` on some Linux setups it hangs;
+on Windows Hub installs, EditMode tests from **Window → General → Test Runner** are the
+reliable path.
 
-1. **Sign in to your Unity account** — required before the Hub will install an Editor.
-2. **Install Unity 6000.5.**
-3. Add modules: **Linux Build Support (IL2CPP)**, plus **Windows Build Support (Mono)** if
-   a Windows build is ever wanted.
-4. Create the project from the **Universal 3D (URP)** template.
+---
 
-Packages to add via Package Manager. Nothing beyond these without a recorded decision:
+## What VS001 includes
 
-| Package | Why |
-| --- | --- |
-| `com.unity.inputsystem` | Per-device routing and local multiplayer. Mandatory — see [ADR-007](Docs/DECISIONS.md). |
-| `com.unity.netcode.gameobjects` | Server-authoritative replication. |
-| `com.unity.transport` | Pulled in by Netcode. |
-| `com.unity.ai.navigation` | Enemy pathfinding. |
+- Listen-server: `NetworkManager.StartHost()`, input is `InputRouter → InputFrame → server RPC` even in-process
+- `PlayerId` (client + local slot) on pawns, weapons, scrip, augments, interaction
+- Two rooms, corridor **Site Bulkhead** (80 scrip) unlocking room two spawn zones
+- Hitscan **Service Sidearm**: recoil, spread, reload, ammo
+- One melee **Sundered** enemy: navmesh, health, damage, death, scrip on kill
+- Wave director: round counter, budget curve, active cap 16
+- Between rounds: 3 of 6 augments, applied through `StatBlock` (Flat / Increased / More)
+- `ProcDepth` cap and per-tick proc budget (no proc content yet; the guards exist)
+- Death → results overlay → restart
 
-### Running tests headlessly
-
-```bash
-DISPLAY=:0 flatpak run --command=/home/sage/Unity/Hub/Editor/6000.5.8f1/Editor/Unity com.unity.UnityHub -batchmode -runTests -testPlatform EditMode -projectPath "$PWD" -testResults Logs/editmode-results.xml -logFile -
-```
-
-> **Do not add `-nographics` to a `-runTests` invocation.** On this machine it hangs
-> indefinitely at `[MODES] Loading mode Default` with the process at 0% CPU — it never
-> reaches the test runner and never writes a results file. With a real display attached the
-> same suite completes in about 30 seconds. `-nographics` is fine for plain compile checks
-> and for `-executeMethod`; it is only the test runner that stalls.
-
-### Platform caveat
-
-Unity officially supports Ubuntu and CentOS on Linux. **CachyOS/Arch is not an officially
-supported distribution.** The Flatpak bundles its own runtime, which removes most library
-mismatch risk, but if the Editor misbehaves the vendor's answer will be "unsupported
-platform."
-
-Verified working on this machine: glibc 2.44, Mesa 26.1.6, RADV on an RX 6650 XT, Vulkan
-available, 451 GB free. RAM is 15 GiB — enough, but Editor plus two test clients will be
-tight; prefer a batchmode server when testing simulation only.
-
-**Licensing** differs materially from a permissively-licensed engine. Unity Personal is free
-below a revenue/funding threshold, above which a paid seat is required. Confirm current
-terms against Unity's site before any commercial planning — they have changed more than
-once. See [ADR-020](Docs/DECISIONS.md).
+**Out of scope (VS002+):** 3rd/4th local players, LAN, prediction, more weapons/enemies,
+elites, art, audio polish.
 
 ---
 
 ## Repository layout
 
-The layout below is the *target* shape, created as milestones land — not all of it exists yet.
-Each `Overrun.*` folder carries an **Assembly Definition** that makes the dependency
-direction in [`Docs/ARCHITECTURE.md`](Docs/ARCHITECTURE.md) §2 a compile-time guarantee.
-
 ```
-Docs/                          Architecture and planning documents
+Docs/                          Architecture and planning
 Assets/
-  Overrun.Core/                PlayerId, RunSeed, StatBlock, TagMask.
-                               No UnityEngine deps beyond ScriptableObject. EditMode-testable.
-  Overrun.Data/                ScriptableObject definitions. Pure data, no behaviour.
-  Overrun.Simulation/          Server-authoritative gameplay.
-  Overrun.Net/                 Session, client↔player mapping, replication, RPC surface.
-                               The only assembly that knows client ids exist.
-  Overrun.Presentation/        Per-local-player rigs, HUD, VFX, audio, camera, feel.
-  Content/
-    Definitions/               .asset data assets
-    Maps/                      Arena scenes
-    Art/                       Greybox and placeholder art
-  Tests/                       EditMode simulation tests
-Packages/                      Package manifest — committed
-ProjectSettings/               Unity project configuration — committed
+  Overrun.Core/                PlayerId, RunSeed, StatBlock, Tag, ProcBudget, InputFrame
+  Overrun.Data/                ScriptableObject definitions (no behaviour)
+  Overrun.Simulation/          Server-authoritative gameplay
+  Overrun.Net/                 Session, roster, RPCs (the only layer that knows ClientId)
+  Overrun.Presentation/        Rigs, HUD, cameras, input routing
+  Content/Scenes/              Bootstrap, World, LocalRigs
+  Content/Definitions/         .asset weapons, enemies, augments
+  Tests/EditMode/              Stat, proc, identity, augment, run-loop tests
 ```
+
+Each `Overrun.*` folder has an Assembly Definition. Simulation cannot reference
+Presentation — that is a compile error, on purpose.
 
 ---
 
@@ -131,16 +148,12 @@ ProjectSettings/               Unity project configuration — committed
 
 | Document | What it covers |
 | --- | --- |
-| [`Docs/GAME_VISION.md`](Docs/GAME_VISION.md) | The game, its pillars, and the originality boundary |
-| [`Docs/ARCHITECTURE.md`](Docs/ARCHITECTURE.md) | Layering, player identity, scene topology, system boundaries |
-| [`Docs/NETWORKING.md`](Docs/NETWORKING.md) | Authority model, client-vs-player, replication, RPC conventions |
-| [`Docs/GAMEPLAY_SYSTEMS.md`](Docs/GAMEPLAY_SYSTEMS.md) | Upgrades, stats, weapons, enemies, wave director, map components |
-| [`Docs/DEVELOPMENT_ROADMAP.md`](Docs/DEVELOPMENT_ROADMAP.md) | Milestones, each independently playable |
-| [`Docs/DECISIONS.md`](Docs/DECISIONS.md) | Architecture decision records |
+| [`Docs/GAME_VISION.md`](Docs/GAME_VISION.md) | The game, pillars, originality boundary |
+| [`Docs/ARCHITECTURE.md`](Docs/ARCHITECTURE.md) | Layering, player identity, scenes |
+| [`Docs/NETWORKING.md`](Docs/NETWORKING.md) | Authority, RPCs, client vs player |
+| [`Docs/GAMEPLAY_SYSTEMS.md`](Docs/GAMEPLAY_SYSTEMS.md) | Stats, augments, director, fixtures |
+| [`Docs/DEVELOPMENT_ROADMAP.md`](Docs/DEVELOPMENT_ROADMAP.md) | Milestones |
+| [`Docs/DECISIONS.md`](Docs/DECISIONS.md) | ADRs |
 
 **When a major architectural decision changes, update `DECISIONS.md` and every document it
 touches in the same commit.**
-
-> This project was briefly planned against Godot before switching to Unity. ADR-001 through
-> ADR-012 are retained as **superseded** history rather than deleted — several record
-> reasoning that still applies, and each superseding ADR points back at the one it replaces.
